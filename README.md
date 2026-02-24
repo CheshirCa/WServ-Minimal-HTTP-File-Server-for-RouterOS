@@ -1,49 +1,68 @@
----
-
-# wserv - Minimal HTTP File Server for RouterOS
-
-Lightweight single-purpose HTTP file server for use in a trusted local network
-Минималистичный HTTP-сервер для работы в доверенной локальной сети
+# wserv — Minimal HTTP File Server for RouterOS
 
 ---
 
-## 🇷🇺 Описание
+## 🇷🇺 Русская версия
 
-**wserv** - небольшой HTTP-сервер для Windows, предназначенный для приёма и выдачи файлов в **локальной сети**, в первую очередь для интеграции с **RouterOS 7.x**.
+### Описание
 
-Проект ориентирован на:
+**wserv** — небольшой HTTP-сервер для Windows, предназначенный для приёма и передачи файлов в **доверенной локальной сети**, в первую очередь для интеграции с **RouterOS 7.x** (MikroTik).
 
-* простоту,
-* предсказуемое поведение,
-* отсутствие зависимостей,
-* работу в доверенной LAN-среде.
-
-Программа поставляется одним `.exe` файлом, имеет минимальный GUI и может работать скрыто.
+Программа ориентирована на простоту, предсказуемое поведение и отсутствие внешних зависимостей.  
+Сервер не предназначен для использования в интернете.
 
 ---
 
-## Возможности
+### Возможности
 
-* HTTP-сервер (IPv4)
-* Поддерживаемые методы:
-
-  * `GET`, `HEAD` - получение файлов
-  * `POST` - загрузка файлов
-* Статические файлы из папки `www`
-* Два режима загрузки файлов:
-
-  * multipart/form-data
-  * raw POST body
-* Опциональная защита загрузок token’ом
-* Ограничение размера запроса (16 MB)
-* Очистка зависших соединений
-* Простое логирование (по желанию)
+- HTTP-сервер (IPv4)
+- Поддерживаемые методы:
+  - `GET`, `HEAD` — скачивание файлов
+  - `POST` — загрузка файлов
+- Работа со статическими файлами из каталога `www`
+- Два способа загрузки файлов:
+  - multipart/form-data
+  - raw POST body
+- Опциональная защита загрузок token’ом
+- Ограничение размера запроса: **16 MB**
+- Очистка зависших соединений
+- Опциональное логирование запросов
 
 ---
 
-## Endpoints
+### Ключи командной строки
 
-### Проверка работоспособности
+```text
+wserv.exe [/p:PORT] [/t:TOKEN] [/l] [/h]
+````
+
+#### `/p:<port>`
+
+Задаёт TCP-порт сервера.
+По умолчанию: `8080`
+
+#### `/t:<token>`
+
+Задаёт token для защиты загрузок (`POST`).
+
+* Token применяется **только к POST**
+* Передаётся через query-string (`?token=SECRET`)
+* Считывается **один раз при старте сервера**
+* Пустой token отключает авторизацию загрузок
+
+#### `/l`
+
+Включает логирование запросов в файл `wserv.log`.
+
+#### `/h` или `/?`
+
+Показывает справку и завершает работу.
+
+---
+
+### Endpoints
+
+#### Проверка работоспособности
 
 ```
 GET  /
@@ -52,17 +71,15 @@ HEAD /
 HEAD /status
 ```
 
-`/status` возвращает текст:
+`/status` возвращает:
 
 ```
 http server status: ok
 ```
 
-Token не требуется.
-
 ---
 
-### Скачивание файлов
+#### Скачивание файлов
 
 ```
 GET  /<filename>
@@ -70,77 +87,37 @@ GET  /www/<filename>
 HEAD /<filename>
 ```
 
-* Файлы берутся из папки `www`
-* Директория в URL игнорируется:
-
-  ```
-  /backup.rsc
-  /www/backup.rsc
-  ```
-
-  → оба отдают `www/backup.rsc`
-* `HEAD` возвращает только заголовки
-* Token не требуется
+* Файлы берутся из каталога `www`
+* Директории в URL игнорируются
+* `GET` и `HEAD` всегда публичные
 
 ---
 
-### Загрузка файлов (multipart)
+#### Загрузка файлов (multipart)
 
 ```
 POST /upload?token=<token>
 ```
 
 * Ожидается `multipart/form-data`
-* Файл сохраняется в `www/` под исходным именем
-* HTML-формы сервер **не предоставляет**
-* Предназначено для `curl`, скриптов и т.п.
-
-**Пример (curl):**
-
-```bash
-curl -F "file=@backup.rsc" \
-     "http://192.168.1.10:8080/upload?token=secret"
-```
+* Файл сохраняется в каталог `www`
+* HTML-форма загрузки отсутствует
 
 ---
 
-### Загрузка файлов (raw)
+#### Загрузка файлов (raw)
 
 ```
 POST /upload-raw?name=<filename>&token=<token>
 ```
 
-* Тело POST сохраняется как файл
-* Имя файла берётся из `name=`
+* Всё тело POST сохраняется как файл
+* Имя файла задаётся параметром `name`
 * Предназначено для RouterOS `/tool fetch`
 
-**Пример (RouterOS):**
-
-```routeros
-:local content [/file get backup.rsc contents]
-/tool fetch \
-  url="http://192.168.1.10:8080/upload-raw?name=backup.rsc&token=secret" \
-  http-method=post \
-  http-data=$content
-```
-
 ---
 
-## Авторизация
-
-* Token применяется **только к POST**
-* Token передаётся через query-string:
-
-  ```
-  ?token=SECRET
-  ```
-* Token считывается **один раз при старте сервера**
-* `GET` и `HEAD` всегда публичные
-* Пустой token = загрузки без авторизации
-
----
-
-## Модель безопасности
+### Модель безопасности
 
 ⚠ **Важно**
 
@@ -148,45 +125,32 @@ POST /upload-raw?name=<filename>&token=<token>
 * ❌ Нет HTTPS / TLS
 * ❌ Нет шифрования
 * ❌ Нет сложной аутентификации
-* ✅ Логи доступны только администратору
-
-Рекомендуется:
-
-* ограничивать доступ firewall’ом,
-* не публиковать URL с token’ом,
-* не использовать в публичных сетях.
+* `GET` и `HEAD` всегда без token’а
+* Логи доступны только администратору
 
 ---
 
-## Ограничения
+### Ограничения
 
 * Только IPv4
 * Только HTTP/1.1
 * `Connection: close`
 * Нет chunked transfer encoding
 * Требуется `Content-Length`
-* Максимальный размер запроса: **16 MB**
 * Файлы **перезаписываются без предупреждения**
-* Зависшие клиенты удаляются через ~30 секунд
+* Зависшие соединения удаляются через ~30 секунд
 
 ---
 
-## Файловая система
+### Файловая система
 
-Все файлы хранятся в папке `www` рядом с exe:
-
-```
-wserv.exe
-www\
-  backup.rsc
-  config.txt
-```
+Все файлы хранятся в каталоге `www` рядом с `wserv.exe`.
 
 ---
 
-## Ограничения на имена файлов
+### Ограничения на имена файлов
 
-Разрешены только:
+Разрешены символы:
 
 ```
 A–Z  a–z  0–9  _  .  -
@@ -201,66 +165,85 @@ A–Z  a–z  0–9  _  .  -
 
 ---
 
-## Поддерживаемые MIME-типы
+### Назначение
 
-* `.txt .log .csv .rsc` → `text/plain`
-* `.html .htm` → `text/html`
-* `.css` → `text/css`
-* `.js` → `application/javascript`
-* `.json` → `application/json`
-* `.png` → `image/png`
-* `.jpg .jpeg` → `image/jpeg`
-* `.gif` → `image/gif`
-* `.pdf` → `application/pdf`
-* прочее → `application/octet-stream`
+Подходит для:
 
----
+* backup / restore RouterOS
+* передачи конфигураций и скриптов
+* lab / test-сред
 
-## Для чего подходит
+Не подходит для:
 
-* Backup / restore RouterOS
-* Передача конфигураций и скриптов
-* Lab / test-среды
-* Внутренние admin-утилиты
-
-## Для чего НЕ подходит
-
-* Публичные серверы
-* Интернет-доступ
-* Многопользовательская работа
-* Среды с требованиями к безопасности
+* публичных серверов
+* интернет-доступа
+* многопользовательских сред
 
 ---
 
+## 🇬🇧 English Version
+
+### Description
+
+**wserv** is a small HTTP server for Windows designed to send and receive files inside a **trusted local network**, primarily for **RouterOS 7.x** (MikroTik) integration.
+
+The server focuses on simplicity, predictability, and zero external dependencies.
+It is **not intended for internet-facing use**.
+
 ---
 
-## 🇬🇧 Description
-
-**wserv** is a small HTTP file server for Windows designed to operate **inside a trusted local network**, primarily for **RouterOS 7.x** integration.
-
-It focuses on simplicity, predictability, and minimal dependencies.
-
----
-
-## Features
+### Features
 
 * IPv4 HTTP server
-* Supported methods: `GET`, `HEAD`, `POST`
+* Supported methods:
+
+  * `GET`, `HEAD` — file download
+  * `POST` — file upload
 * Static file serving from `www` directory
 * Two upload modes:
 
   * multipart/form-data
   * raw POST body
-* Optional token protection for uploads
-* 16 MB request size limit
+* Optional upload protection via token
+* Request size limit: **16 MB**
 * Automatic cleanup of stalled connections
 * Optional request logging
 
 ---
 
-## Endpoints
+### Command Line Arguments
 
-### Health check
+```text
+wserv.exe [/p:PORT] [/t:TOKEN] [/l] [/h]
+```
+
+#### `/p:<port>`
+
+Sets the TCP listening port.
+Default: `8080`
+
+#### `/t:<token>`
+
+Sets an upload authorization token (`POST` only).
+
+* Applies only to `POST`
+* Passed via query string (`?token=SECRET`)
+* Read once at server startup
+* Empty token disables upload authentication
+
+#### `/l`
+
+Enables request logging to `wserv.log`.
+
+#### `/h` or `/?`
+
+Displays help and exits.
+
+---
+
+### Endpoints
+
+#### Health check
 
 ```
 GET  /
@@ -271,7 +254,7 @@ HEAD /status
 
 ---
 
-### File download
+#### File download
 
 ```
 GET  /<filename>
@@ -284,7 +267,7 @@ Files are served from the `www` directory.
 
 ---
 
-### Multipart upload
+#### Multipart upload
 
 ```
 POST /upload?token=<token>
@@ -295,7 +278,7 @@ No HTML upload form is provided.
 
 ---
 
-### Raw upload
+#### Raw upload
 
 ```
 POST /upload-raw?name=<filename>&token=<token>
@@ -306,28 +289,72 @@ Designed for RouterOS `/tool fetch`.
 
 ---
 
-## Security model
+### Security model
+
+⚠ **Important**
 
 * Designed for trusted LAN only
-* No HTTPS / TLS
-* No encryption
-* Uploads protected by optional token
-* GET/HEAD are public
+* ❌ No HTTPS / TLS
+* ❌ No encryption
+* ❌ No advanced authentication
+* `GET` and `HEAD` do not require a token
+* Logs are accessible only to the administrator
 
 ---
 
-## Limitations
+### Limitations
 
 * IPv4 only
 * HTTP/1.1 only
-* No chunked encoding
+* `Connection: close`
+* No chunked transfer encoding
 * `Content-Length` required
 * Files overwrite without warning
-* 16 MB max request size
+* Stalled connections are removed after ~30 seconds
+
+---
+
+### File system
+
+All files are stored in the `www` directory next to `wserv.exe`.
+
+---
+
+### Filename restrictions
+
+Allowed characters:
+
+```
+A–Z  a–z  0–9  _  .  -
+```
+
+Forbidden:
+
+* `/` `\`
+* `..`
+* spaces
+* special characters
+
+---
+
+### Intended use
+
+Suitable for:
+
+* RouterOS backup / restore
+* configuration and script transfer
+* lab / test environments
+
+Not suitable for:
+
+* public servers
+* internet exposure
+* multi-user environments
 
 ---
 
 ## License
 
 Use at your own risk.
-Intended for controlled local environments.
+Designed for controlled local environments.
+
